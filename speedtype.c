@@ -12,6 +12,24 @@
 #define PAIR_RED 4
 #define PAIR_WHITE 7
 
+enum { NS_PER_SECOND = 1000000000 };
+
+void sub_timespec(struct timespec t1, struct timespec t2, struct timespec *td)
+{
+    td->tv_nsec = t2.tv_nsec - t1.tv_nsec;
+    td->tv_sec  = t2.tv_sec - t1.tv_sec;
+    if (td->tv_sec > 0 && td->tv_nsec < 0)
+    {
+        td->tv_nsec += NS_PER_SECOND;
+        td->tv_sec--;
+    }
+    else if (td->tv_sec < 0 && td->tv_nsec > 0)
+    {
+        td->tv_nsec -= NS_PER_SECOND;
+        td->tv_sec++;
+    }
+}
+
 char* read_file(const char* filename) {
     FILE* fp = fopen(filename, "r");
     if (!fp) {
@@ -30,7 +48,7 @@ char* read_file(const char* filename) {
     return content;
 }
 
-void draw_text(WINDOW* win, const char* text, const char* typed, int pos, int corr, int incorr)
+void draw_text(WINDOW* win, const char* text, const char* typed, int pos, int* corr, int* incorr)
 {
     int len = strlen(text);
     int y,x;
@@ -38,19 +56,23 @@ void draw_text(WINDOW* win, const char* text, const char* typed, int pos, int co
     int start_y = y;
     int start_x = x;
 
+    *corr = 0;
+    *incorr = 0;
+
     for (int i=0;i< len;i++)
     {
         if(i<pos){
             //Already typed
             if((typed[i]==text[i]))
             {
-                corr++;
+                (*corr)++;
                 wattron(win, COLOR_PAIR(PAIR_WHITE));
             }
             else{
-                incorr++;
+                (*incorr)++;
                 wattron(win, COLOR_PAIR(PAIR_RED));
             }
+            waddch(win, text[i]);
         }
         else if(i==pos) //current letter
         {
@@ -82,6 +104,9 @@ int main(int argc, char *argv[])
 
     char* typed = calloc(len + 1, sizeof(char));
     int pos = 0;
+    int correct = 0;
+    int incorrect = 0;
+    struct timespec start, finish, delta;
 
 
     // Initialize ncurses
@@ -112,24 +137,25 @@ int main(int argc, char *argv[])
     mvprintw(1,0, "Press Enter to Begin\n");
     mvprintw(2,0, "Press Esc to exit.");
     move(3,0);
-    curs_set(2);
+    curs_set(0);
     refresh();
-    int input = getch();
-    if( input == 27){ //ESC KEY
+    int ch = getch();
+    if( ch == 27){ //ESC KEY
         endwin();
         exit(1);
     }
-    else if (input == '\n' || input == '\r' || input == KEY_ENTER) // Enter
+    else if (ch == '\n' || ch == '\r' || ch == KEY_ENTER) // Enter
     {
         // Draw initial text
         mvprintw(4,0, "Right, Starting in a second...\n");
         refresh();
         clear();
-        draw_text(stdscr, text, typed, pos,0,0);
+        draw_text(stdscr, text, typed, pos, &correct, &incorrect);
         move(0,0);
         refresh();
         getch();
 
+        clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     }
     else{
         mvprintw(4,0, "Wrong Key! Exiting in a second...\n");
@@ -138,10 +164,40 @@ int main(int argc, char *argv[])
         endwin();
         exit(1);
     }
+    while (pos < len) {
+        ch = getch();
+        if (ch == 27) {  // ESC key
+            break;
+        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == '\b') {
+            // Handle backspace
+            if (pos > 0) {
+                pos--;
+                typed[pos] = '\0';
+            }
+        } else if (ch >= 32 && ch <= 126) {  // Printable characters
+            typed[pos] = ch;
+            pos++;
+        }
+
+        // Redraw text
+        move(0, 0);
+        clrtoeol();
+        draw_text(stdscr, text, typed, pos, &correct, &incorrect);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &finish);
+    sub_timespec(start, finish, &delta);
 
     // Cleanup
     endwin();
     free(text);
     free(typed);
+
+    //  Stats
+    printf("Total characters: %d\n", (correct + incorrect));
+    printf("Correct characters: %d\n", correct);
+    printf("Incorrect characters: %d\n", incorrect);
+    printf("Typing accuracy: %.2f%%\n", (correct * 100.0) / (correct + incorrect));
+    printf("Time Taken: %.3f s\n", (double)delta.tv_sec + (double)delta.tv_nsec / 1e9);
     return 0;
 }
