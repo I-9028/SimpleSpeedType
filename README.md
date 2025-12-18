@@ -34,7 +34,7 @@ You'll need the ``ncurses`` library installed:
 ``./speedtype``
 
 ## Usage
-**Starting the Program:**
+### Starting the Program:
 When you run the program, you will see:
 ```
 Welcome to this Typing Test.
@@ -42,14 +42,14 @@ Press Enter to Begin
 Press Esc to exit.
 ```
 
-**Selecting a Mode**
+### Selecting a Mode
 If you press anything apart from ``Enter``, you exit the program. On pressing ``Enter``, you are greeted by a prompt asking you to select a mode:
 ```
 Timed Mode or No? Y/N
 Default is non-timed
 ```
 
-**Timed Mode**
+### Timed Mode
 Pressing ``Y`` or ``y`` lands you into timed mode. 
 
 Enter the test duration in seconds (1-600, default: 60)
@@ -68,14 +68,16 @@ The quick brown fox jumps over the lazy dog
 
 The test ends when you finish, time runs out, or you press ``Esc``.
 
-**Untimed Mode**
+### Untimed Mode
+
 Pressing any other key on the mode selection screen alnds you here.
 
 Type at your own pace.
 
 Complete the entire text or press ``Esc`` to exit early.
 
-**Results**
+### Results
+
 Once you finish or exit the test, the results are displays as follows:
 ```
 Total characters: 139
