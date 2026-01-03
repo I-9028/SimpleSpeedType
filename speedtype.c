@@ -1,10 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ncurses.h>
 #include <time.h>
 #include <signal.h>
-#include <unistd.h>
+#include <stdbool.h>
+
+#ifdef _WIN32
+    #include <windows.h>
+    #include <conio.h>
+#define CLOCK_MONOTONIC_RAW 0
+#else
+    #include <ncurses.h>
+    #include <unistd.h>
+#endif
 
 #define COLOR_GREY 8
 #define PAIR_GREEN 2
@@ -13,6 +21,18 @@
 #define PAIR_WHITE 7
 
 enum { NS_PER_SECOND = 1000000000 };
+
+#ifdef _WIN32
+// Windows console color codes
+#define WIN_GREEN (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define WIN_RED (FOREGROUND_RED | FOREGROUND_INTENSITY)
+#define WIN_WHITE (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
+#define WIN_GREY (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
+
+HANDLE hConsole;
+CONSOLE_SCREEN_BUFFER_INFO csbi;
+#endif
+
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec *td)
 {
@@ -29,6 +49,17 @@ void sub_timespec(struct timespec t1, struct timespec t2, struct timespec *td)
         td->tv_sec++;
     }
 }
+
+#ifdef _WIN32
+int clock_gettime(int dummy, struct timespec *spec) {
+    __int64 wintime;
+    GetSystemTimeAsFileTime((FILETIME*)&wintime);
+    wintime -= 116444736000000000LL;  // Unix epoch adjustment
+    spec->tv_sec = wintime / 10000000LL;
+    spec->tv_nsec = (wintime % 10000000LL) * 100;
+    return 0;
+}
+#endif
 
 char* read_file(const char* filename) {
     FILE* fp = fopen(filename, "r");
@@ -52,6 +83,68 @@ char* read_file(const char* filename) {
     return content;
 }
 
+#ifdef _WIN32
+void clear_screen(){
+    system("cls");
+}
+
+void move_cursor(int x, int y){
+    COORD coord={x, y};
+    SetConsoleCursorPosition(hConsole, coord);
+}
+
+void set_color(int color){
+    SetConsoleTextAttribute(hConsole, color);
+}
+
+void show_hide_cursor(bool visible){
+    CONSOLE_CURSOR_INFO info;
+    info.dwSize = 100;
+    info.bVisible = visible;
+    SetConsoleCursorInfo(hConsole, &info);
+}
+
+void draw_text_windows(const char* text, const char* typed, int pos, int* corr, int* incorr, int start_y)
+{
+    int len = strlen(text);
+    *corr = 0;
+    *incorr = 0;
+
+    move_cursor(0, start_y);
+
+
+    for (int i=0;i< len;i++)
+    {
+        if(i<pos){
+            //Already typed
+            if((typed[i]==text[i]))
+            {
+                (*corr)++;
+                set_color(WIN_WHITE);
+            }
+            else{
+                (*incorr)++;
+                set_color(WIN_RED);
+            }
+            printf("%c", text[i]);
+        }
+        else if(i==pos) //current letter
+        {
+            set_color(WIN_GREEN);
+            printf("%c", text[i]);
+        }
+        else //yet to type
+        {
+            set_color(WIN_GREY);
+            printf("%c", text[i]);
+        }
+    }
+    fflush(stdout);
+
+}
+#endif
+
+#ifndef _WIN32
 void draw_text(WINDOW* win, const char* text, const char* typed, int pos, int* corr, int* incorr)
 {
     int len = strlen(text);
@@ -91,6 +184,7 @@ void draw_text(WINDOW* win, const char* text, const char* typed, int pos, int* c
     }
     wrefresh(win);
 }
+#endif
 
 int main(int argc, char *argv[])
 {
