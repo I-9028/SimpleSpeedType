@@ -7,10 +7,11 @@ A simple Terminal-based typing test written in C using ncurses. Test your typing
 - **Real-time Colored Feedback**: Gray shows untyped text, white shows text ypu entered correctly, red shows incorrect letters (do you have the leeway to go back and correct?), green denotes the current character you're on.
 
 ## Suppoted Platfroms
-**Linux** only with planned Windows support.
+**Linux**, **Windows**.
 
 ## Prerequisites
-You'll need the ``ncurses`` library installed:
+**Windows**: N/A
+**Linux**: You'll need the ``ncurses`` library installed:
 
 ### Ubuntu/Debian
 
