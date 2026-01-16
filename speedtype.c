@@ -97,14 +97,14 @@ void set_color(int color){
     SetConsoleTextAttribute(hConsole, color);
 }
 
-void show_hide_cursor(bool visible){
+void show_cursor(bool visible){
     CONSOLE_CURSOR_INFO info;
     info.dwSize = 100;
     info.bVisible = visible;
     SetConsoleCursorInfo(hConsole, &info);
 }
 
-void draw_text_windows(const char* text, const char* typed, int pos, int* corr, int* incorr, int start_y)
+void draw_text_windows(const char* text, const char* typed, int pos, int* corr, int* incorr, int start_y) //start-y to denote where to start the text print, 0 if untimed, 2 if timed
 {
     int len = strlen(text);
     *corr = 0;
@@ -208,32 +208,101 @@ int main(int argc, char *argv[])
     double time_limit = 60.000;
     struct timespec start, finish, delta, now;
 
+    #ifdef _WIN32
+        hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleScreenBufferInfo(hConsole, &csbi);
+    #else
+        // Initialize ncurses
+        initscr();
+        //Check if Terminal supports color
+        if (has_colors() == FALSE) {
+            free(text);
+            free(typed);
+            endwin();
+            printf("Your terminal does not support color\n");
+            exit(1);
+        }
+        cbreak();
+        noecho();
+        keypad(stdscr, TRUE);
 
-    // Initialize ncurses
-    initscr();
-    //Check if Terminal supports color
-    if (has_colors() == FALSE) {
-        free(text);
-        free(typed);
-        endwin();
-        printf("Your terminal does not support color\n");
-        exit(1);
-    }
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
+        start_color();
+        //char *typed = calloc(len+1, sizeof(char));
+        init_color(8, 500, 500, 500);
+        // 8 from history, for Grey/Bright Black
 
-    start_color();
-    //char *typed = calloc(len+1, sizeof(char));
-    init_color(8, 500, 500, 500);
-    // 8 from history, for Grey/Bright Black
-
-    init_pair(PAIR_GREEN, COLOR_GREEN, COLOR_BLACK);
-    init_pair(PAIR_GREY, COLOR_GREY, COLOR_BLACK);
-    init_pair(PAIR_RED, COLOR_RED, COLOR_BLACK);
-    init_pair(PAIR_WHITE, COLOR_WHITE, COLOR_BLACK);
+        init_pair(PAIR_GREEN, COLOR_GREEN, COLOR_BLACK);
+        init_pair(PAIR_GREY, COLOR_GREY, COLOR_BLACK);
+        init_pair(PAIR_RED, COLOR_RED, COLOR_BLACK);
+        init_pair(PAIR_WHITE, COLOR_WHITE, COLOR_BLACK);
+    #endif
 
     // Let the Games Begin
+
+#ifdef _WIN32
+    clear_screen();
+    printf("Welcome to this Typing Test.\n");
+    printf("Press Enter to Begin\n");
+    printf("Press Esc to exit.");
+    show_cursor(false);
+
+    while(1){
+        if(_kbhit()){
+            int ch = _getch();
+            if (ch == '\r' || ch == '\n') break;
+            if (ch== 27){
+                show_cursor(true);
+                free(text);
+                free(typed);
+                return 0;
+            }
+        }
+        Sleep(50);
+    }
+    // Windows timed mode prompt
+    clear_screen();
+    printf("Timed Mode or No? Y/N\nDefault is non-timed\n");
+
+    while (1) {
+        if (_kbhit()) {
+            int ch = _getch();
+            if (ch == 'Y' || ch == 'y') {
+                timed_mode = true;
+                break;
+            } else if (ch == 'N' || ch == 'n' || ch == '\r' || ch == '\n') {
+                timed_mode = false;
+                break;
+            }
+        }
+        Sleep(50);
+    }
+
+    if (timed_mode) {
+        clear_screen();
+        printf("Enter the number of seconds you wanna test for\n");
+        printf("Enter a number between 0 and 600\n");
+        printf("Default is 60s\n");
+        show_cursor(true);
+
+        char buf[8] = {0};
+        fgets(buf, sizeof(buf), stdin);
+
+        if (buf[0] != '\0' && buf[0] != '\n') {
+            double val = atof(buf);
+            if (val > 0.0 && val <= 600.0) {
+                time_limit = val;
+            }
+        }
+        show_cursor(false);
+
+        clear_screen();
+        printf("Timed test: %.3f seconds\n\n", time_limit);
+        draw_text_windows(text, typed, pos, &correct, &incorrect, 2);
+    } else {
+        clear_screen();
+        draw_text_windows(text, typed, pos, &correct, &incorrect, 0);
+    }
+#else
     clear();
     mvprintw(0,0, "Welcome to this Typing Test.\n");
     mvprintw(1,0, "Press Enter to Begin\n");
@@ -250,44 +319,46 @@ int main(int argc, char *argv[])
         int chres = getch();
         if (chres == 'Y' || chres == 'y'){
             timed_mode = true;
-            refresh();}
+            refresh();
 
-            if(timed_mode){
-                clear();
-                // Draw initial text timed mode.
-                mvprintw(0,0, "Enter the number of seconds you wanna test for\nEnter a number between 0 and 600\nDefault is 60s");
-                refresh();
-                echo();        // show typed characters
-                curs_set(1);
-                char buf[8] = {0};
-                mvgetnstr(3, 0, buf, sizeof(buf)-1);
+        }
 
-                noecho();      // go back to hidden typing
-                curs_set(0);
+        if(timed_mode){
+            clear();
+            // Draw initial text timed mode.
+            mvprintw(0,0, "Enter the number of seconds you wanna test for\nEnter a number between 0 and 600\nDefault is 60s");
+            refresh();
+            echo();        // show typed characters
+            curs_set(1);
+            char buf[8] = {0};
+            mvgetnstr(3, 0, buf, sizeof(buf)-1);
 
-                if (buf[0] != '\0') {
-                    double val = atof(buf);
-                    if (val > 0.0 && val <= 600.0) {
-                        time_limit = val;
-                    }
+            noecho();      // go back to hidden typing
+            curs_set(0);
+
+            if (buf[0] != '\0') {
+                double val = atof(buf);
+                if (val > 0.0 && val <= 600.0) {
+                    time_limit = val;
                 }
+            }
 
-                clear();
-                mvprintw(0, 0, "Timed test: %6.3f seconds", time_limit);
-                move(2,0);
-                refresh();
-                draw_text(stdscr, text, typed, pos, &correct, &incorrect);
-            }
-            else{
-                refresh();
-                // Draw initial text Non timed mode.
-                mvprintw(1,0, "Right, Starting in a second...\n");
-                refresh();
-                clear();
-                draw_text(stdscr, text, typed, pos, &correct, &incorrect);
-                move(0,0);
-                refresh();
-            }
+            clear();
+            mvprintw(0, 0, "Timed test: %6.3f seconds", time_limit);
+            move(2,0);
+            refresh();
+            draw_text(stdscr, text, typed, pos, &correct, &incorrect);
+        }
+        else{
+            refresh();
+            // Draw initial text Non timed mode.
+            mvprintw(1,0, "Right, Starting in a second...\n");
+            refresh();
+            clear();
+            draw_text(stdscr, text, typed, pos, &correct, &incorrect);
+            move(0,0);
+            refresh();
+        }
     }
     else{
         free(text);
@@ -295,7 +366,59 @@ int main(int argc, char *argv[])
         endwin();
         exit(1);
     }
+#endif
     // ***********************TYPING TEST BEGINS*********************************
+
+#ifdef _WIN32
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+    while (pos < len){
+        if(timed_mode){
+            clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+            sub_timespec(start, now, &delta);
+            double elapsed = delta.tv_sec + delta.tv_nsec / 1e9;
+            double time_left = time_limit - elapsed;
+            if (time_left < 0) time_left = 0;
+            if (time_left == 0) break;
+
+            move_cursor(0,0);
+            set_color(WIN_GREEN);
+            printf("Time: %6.3fs", time_left);
+            for (int i = 0; i < 50; i++) printf(" ");
+            set_color(WIN_WHITE);
+        }
+
+        int ch = -1;
+
+        if(_kbhit()){
+            ch = _getch();
+            if (ch == 0 || ch == 224){
+                _getch();
+                ch = -1;
+            }
+        }
+
+        if(ch==-1)
+        {
+            Sleep(50);
+            continue;
+        }
+
+        if(ch == 27){
+            break;
+        }
+        else if(ch == '\b' || ch == 127){//backspace or DEL
+            if (pos > 0) {
+                pos--;
+                typed[pos] = '\0';
+            }
+        } else if (ch >= 32 && ch <= 126) {  // Printable characters
+            typed[pos] = ch;
+            pos++;
+        }
+        draw_text_windows(text, typed, pos, &correct, &incorrect, timed_mode ? 2 : 0);
+    }
+
+#else
     timeout(50); //to have a proper timer without waiting for user input
     clock_gettime(CLOCK_MONOTONIC_RAW, &start);
     while (pos < len) {
@@ -347,12 +470,17 @@ int main(int argc, char *argv[])
         clrtoeol();
         draw_text(stdscr, text, typed, pos, &correct, &incorrect);
     }
-
+#endif
     clock_gettime(CLOCK_MONOTONIC_RAW, &finish);
     sub_timespec(start, finish, &delta);
 
     // Cleanup
+#ifdef _WIN32
+    set_color(WIN_WHITE);
+    show_cursor(true);
+#else
     endwin();
+#endif
     free(text);
     free(typed);
 
