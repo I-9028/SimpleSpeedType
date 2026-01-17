@@ -190,7 +190,11 @@ int main(int argc, char *argv[])
 {
     char* text = read_file("data.txt");
     if (!text) {
+#ifdef _WIN32
+        MessageBox(NULL, "Could not read/find data.txt\nPlease make sure data.txt exists in the same directory as the executable.", "Error - File Not Found", MB_OK | MB_ICONERROR);
+#else
         fprintf(stderr, "Error: Could not read data.txt\n");
+#endif
         return 1;
     }
 
@@ -476,6 +480,7 @@ int main(int argc, char *argv[])
 
     // Cleanup
 #ifdef _WIN32
+    clear_screen();
     set_color(WIN_WHITE);
     show_cursor(true);
 #else
@@ -490,5 +495,11 @@ int main(int argc, char *argv[])
     printf("Incorrect characters: %d\n", incorrect);
     printf("Typing accuracy: %.2f%%\n", (correct * 100.0) / (correct + incorrect));
     printf("Time Taken: %.3f s\n", (double)delta.tv_sec + (double)delta.tv_nsec / 1e9);
+
+#ifdef _WIN32
+    printf("Press any key to exit.");
+    _getch();
+#endif
+
     return 0;
 }
