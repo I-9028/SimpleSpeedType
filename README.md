@@ -92,8 +92,6 @@ Time Taken: 59.203 s
 The text you wish to perform a test with should be pasted in ``data.txt``
 
 ## To-Do
-1) Add UserWarning if data.txt not provided with Windows executable.
-2) Fix Issues regarding missing statistics display on Windows testing.
-3) Add a Makefile for easier packaging.
-4) Add a strict mode. Exits when you make a single error.
-5) Add multiple text samples for variety.
+1) Add a Makefile for easier packaging.
+2) Add a strict mode. Exits when you make a single error.
+3) Add multiple text samples for variety.
